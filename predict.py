@@ -35,6 +35,15 @@ def get_popular_percentage(df):
     return df[df.State == "Popular"].D_Prob[0]
 
 
+def read_poll_info(csv_file):
+    df = pd.read_csv(csv_file)
+    df.D = df.D.apply(percent_from_str)
+    df.R = df.R.apply(percent_from_str)
+    df["Effective_Size"] = df.Size * (df.D + df.R)
+    df["D_Count"] = df.Size * df.D
+    return (df.Effective_Size.sum(), df.D_Count.sum())
+
+
 def logit(p):
     return np.log(p) - np.log(1 - p)
 
@@ -54,6 +63,7 @@ if __name__ == "__main__":
     # If this isn't 50 something is wrong
     num_states = len(state_votes)
     popular_p = get_popular_percentage(state_df)
+    polled_size, polled_d = read_poll_info("polls.csv")
 
     model = pm.Model()
     with model:
@@ -67,6 +77,7 @@ if __name__ == "__main__":
         p_likes_biden = pm.Deterministic(
             "p_likes_biden", pm.math.dot(state_weights, state_probs)
         )
+        polled = pm.Binomial("polled", polled_size, p_likes_biden, observed=polled_d)
         biden_state_wins = pm.Bernoulli(
             "biden_state_wins", p=state_probs.flatten(), shape=(num_states,)
         )
@@ -74,6 +85,8 @@ if __name__ == "__main__":
             "biden_electors", pm.math.dot(state_electors, biden_state_wins)
         )
         trace = pm.sample()
+    pm.traceplot(trace, combined=True)
+    plt.gcf().savefig(".out/posterior.png")
     pm.plots.plot_posterior(trace, var_names="biden_electors")
     plt.gcf().savefig(".out/electors.png")
     pm.plots.forestplot(
@@ -92,4 +105,6 @@ if __name__ == "__main__":
     p_biden_wins = np.count_nonzero(biden_wins) / SAMPLE_SIZE
     # 95% confidence interval
     confidence = 1.96 * math.sqrt(p_biden_wins * (1 - p_biden_wins) / SAMPLE_SIZE)
-    print(f"\nProbability of Biden Winning: {p_biden_wins * 100:.2f}% ± {confidence * 100:.2f}%")
+    print(
+        f"\nProbability of Biden Winning: {p_biden_wins * 100:.2f}% ± {confidence * 100:.2f}%"
+    )
