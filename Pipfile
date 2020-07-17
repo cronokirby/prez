@@ -8,6 +8,7 @@ black = "*"
 
 [packages]
 pymc3 = "*"
+pandas = "*"
 
 [requires]
 python_version = "3.8"
