@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pymc3 as pm
 import pandas as pd
+import math
 
 
 def percent_from_str(s):
@@ -42,6 +43,8 @@ def logit(p):
 VARIANCE = 0.05
 # The correlation between logits of different states
 STATE_CORR = 0.5
+# The number of samples to make for the final empirical odds
+SAMPLE_SIZE = 10000
 
 if __name__ == "__main__":
     state_df = read_state_info("state_info.csv")
@@ -52,7 +55,6 @@ if __name__ == "__main__":
     num_states = len(state_votes)
     popular_p = get_popular_percentage(state_df)
 
-    print(state_df)
     model = pm.Model()
     with model:
         mu_a = pm.Normal("mu_a", mu=logit(popular_p), sigma=pm.math.sqrt(VARIANCE))
@@ -81,3 +83,13 @@ if __name__ == "__main__":
         colors=["red", "blue", "blue", "blue"],
     )
     plt.gcf().savefig(".out/state_probabilities.png")
+    biden_electors = np.array(
+        pm.sample_posterior_predictive(
+            trace, var_names=["biden_electors"], samples=SAMPLE_SIZE, model=model
+        )["biden_electors"]
+    )
+    biden_wins = biden_electors >= 270
+    p_biden_wins = np.count_nonzero(biden_wins) / SAMPLE_SIZE
+    # 95% confidence interval
+    confidence = 1.96 * math.sqrt(p_biden_wins * (1 - p_biden_wins) / SAMPLE_SIZE)
+    print(f"\nProbability of Biden Winning: {p_biden_wins * 100:.2f}% ± {confidence * 100:.2f}%")
