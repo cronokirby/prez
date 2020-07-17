@@ -1,8 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import pymc3 as pm
 import pandas as pd
 import math
+
+
+# The variance for the logits of probabilities
+VARIANCE = 0.05
+# The correlation between logits of different states
+STATE_CORR = 0.5
+# The number of samples to make for the final empirical odds
+SAMPLE_SIZE = 1000
+# The turnout we expect, also acts as a kind of normalizer. The higher the turnout
+# the less likely to win a state where you're behind in opinion
+TURNOUT = 100
+# The number of electors you need to win
+ELECTORS_TO_WIN = 270
 
 
 def percent_from_str(s):
@@ -48,12 +62,16 @@ def logit(p):
     return np.log(p) - np.log(1 - p)
 
 
-# The variance for the logits of probabilities
-VARIANCE = 0.05
-# The correlation between logits of different states
-STATE_CORR = 0.5
-# The number of samples to make for the final empirical odds
-SAMPLE_SIZE = 10000
+def bin_conf_95(p_hat, n_samples):
+    return 1.96 * math.sqrt(p_hat * (1 - p_hat) / n_samples)
+
+
+def simulate(ps, state_electors):
+    wins = np.random.binomial(TURNOUT, ps) > TURNOUT / 2
+    electors = np.dot(wins, state_electors)
+    p_hat = np.count_nonzero(electors >= ELECTORS_TO_WIN) / len(electors)
+    return (wins, electors, p_hat, bin_conf_95(p_hat, len(electors)))
+
 
 if __name__ == "__main__":
     state_df = read_state_info("state_info.csv")
@@ -78,17 +96,9 @@ if __name__ == "__main__":
             "p_likes_biden", pm.math.dot(state_weights, state_probs)
         )
         polled = pm.Binomial("polled", polled_size, p_likes_biden, observed=polled_d)
-        biden_state_wins = pm.Bernoulli(
-            "biden_state_wins", p=state_probs.flatten(), shape=(num_states,)
-        )
-        biden_electors = pm.Deterministic(
-            "biden_electors", pm.math.dot(state_electors, biden_state_wins)
-        )
-        trace = pm.sample(tune=2000)
+        trace = pm.sample()
     pm.traceplot(trace, combined=True)
     plt.gcf().savefig(".out/posterior.png")
-    pm.plots.plot_posterior(trace, var_names="biden_electors")
-    plt.gcf().savefig(".out/electors.png")
     pm.plots.forestplot(
         trace,
         var_names="state_probs",
@@ -96,15 +106,32 @@ if __name__ == "__main__":
         colors=["red", "blue", "blue", "blue"],
     )
     plt.gcf().savefig(".out/state_probabilities.png")
-    biden_electors = np.array(
+    state_probs = np.array(
         pm.sample_posterior_predictive(
-            trace, var_names=["biden_electors"], samples=SAMPLE_SIZE, model=model
-        )["biden_electors"]
+            trace, var_names=["state_probs"], samples=SAMPLE_SIZE, model=model
+        )["state_probs"]
     )
-    biden_wins = biden_electors >= 270
-    p_biden_wins = np.count_nonzero(biden_wins) / SAMPLE_SIZE
-    # 95% confidence interval
-    confidence = 1.96 * math.sqrt(p_biden_wins * (1 - p_biden_wins) / SAMPLE_SIZE)
-    print(
-        f"\nProbability of Biden Winning: {p_biden_wins * 100:.2f}% ± {confidence * 100:.2f}%"
+    wins, electors, p_hat, p_delta = simulate(state_probs, state_electors)
+    state_ps = np.count_nonzero(wins, axis=0) / SAMPLE_SIZE
+    state_probs = sorted(
+        list(zip(list(state_df[state_df.State != "Popular"].State), list(state_ps))),
+        key=lambda x: x[1],
     )
+    plt.clf()
+    fig = plt.subplots(1, 1)
+    plt.hist(electors, bins=100)
+    plt.gcf().savefig(".out/electors.png")
+    print(f"\nBiden wins with {p_hat * 100:.2f} ± {p_delta * 100:.2f}%")
+    plt.clf()
+    fig, ax = plt.subplots(1, 1, figsize=(8, 12))
+    rtb = mcolors.LinearSegmentedColormap.from_list("", [(0, "red"), (1, "blue")])
+    ax.barh(
+        list(np.arange(num_states)),
+        [x[1] for x in state_probs],
+        align="center",
+        color=rtb(np.array([x[1] for x in state_probs])),
+    )
+    ax.set_yticks(list(np.arange(num_states)))
+    ax.set_yticklabels([x[0] for x in state_probs])
+    fig.savefig(".out/states.png")
+
