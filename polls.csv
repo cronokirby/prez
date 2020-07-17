@@ -1,4 +1,19 @@
 State,Size,Type,D,R,Date,Pollster,Grade
 National,1115,A,43%,36%,2020-07-13,Ipsos,B-
 National,961,RV,47%,37%,2020-07-13,Ipsos,B-
-National,1252,RV,49%,40%,2020-07-12,YouGov,B-
+National,1252,RV,49%,40%,2020-07-12,YouGov,B
+National,1081,RV,47%,39%,2020-07-11,YouGov,B
+National,1258,LV,51%,41%,2020-07-10,Change,C-
+National,1273,RV,52%,37%,2020-07-09,Quinnipiac,B+
+National,900,RV,51%,40%,2020-07-09,NBC,A-
+National,2500,LV,47%,39%,2020-07-08,Rasmussen,C+
+National,32514,RV,47%,39%,2020-07-06,Morning Consult,B
+National,1200,RV,46%,39%,2020-07-09,RMG,B
+National,1853,LV,48%,39%,2020-07-09,Redfield & Wilton,
+National,1000,LV,49%,42%,2020-07-08,John Zogby,
+National,673,RV,52%,42%,2020-07-07,Data for Progress,B-
+National,745,A,53%,42%,2020-07-07,Data for Progress,B-
+National,33549,RV,48%,39%,2020-06-29,Morning Consult,B
+National,952,RV,43%,37%,2020-07-06,Ipsos,B-
+National,1114,A,40%,34%,2020-07-06,Ipsos,A
+National,1165,R,49%,40%,2020-07-05,YouGov,B
