@@ -84,7 +84,7 @@ if __name__ == "__main__":
         biden_electors = pm.Deterministic(
             "biden_electors", pm.math.dot(state_electors, biden_state_wins)
         )
-        trace = pm.sample()
+        trace = pm.sample(tune=2000)
     pm.traceplot(trace, combined=True)
     plt.gcf().savefig(".out/posterior.png")
     pm.plots.plot_posterior(trace, var_names="biden_electors")
