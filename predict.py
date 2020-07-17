@@ -50,12 +50,29 @@ class PollData:
 SAMPLE_SIZE = 1000
 
 if __name__ == "__main__":
-    data = PollData.from_csv("./polls.csv")
-    observed = [data.count_D, data.count_R, data.count_O]
     model = pm.Model()
     with model:
-        probs = pm.Dirichlet("probs", [1.0, 1.0, 1.0])
-        results = pm.Multinomial("results", data.size, probs, observed=observed)
-        trace = pm.sample(SAMPLE_SIZE)
-    pm.traceplot(trace)
+        mu_a = pm.Normal("mu_a", mu=0, sigma=1)
+        mu_b = pm.Normal("mu_b", mu=0, sigma=1, shape=(4,))
+        state_probs = pm.Deterministic("state_probs", pm.math.sigmoid(mu_a + mu_b))
+        texas_results = pm.Binomial("tx_results", 100, state_probs[0], observed=40)
+        p_likes_biden = pm.Deterministic(
+            "p_likes_biden", pm.math.dot([0.7, 0.3, 0.2, 0.1], state_probs)
+        )
+        biden_state_wins = pm.Bernoulli(
+            "biden_state_wins", p=state_probs.flatten(), shape=(4,)
+        )
+        biden_electors = pm.Deterministic(
+            "biden_electors", pm.math.dot([4, 0, 0, 0], biden_state_wins)
+        )
+        results = pm.Binomial("results", 100, p_likes_biden, observed=60)
+        trace = pm.sample()
+    pm.plots.plot_posterior(trace, var_names="biden_electors")
+    plt.gcf().savefig(".out/electors.png")
+    pm.plots.forestplot(
+        trace,
+        var_names="state_probs",
+        combined=True,
+        colors=["red", "blue", "blue", "blue"],
+    )
     plt.gcf().savefig(".out/posterior.png")
